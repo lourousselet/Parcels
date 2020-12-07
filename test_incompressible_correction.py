@@ -75,7 +75,7 @@ RvaluesY = np.random.uniform(0.1,0.95,200)
 count = 0
 X, Y = [], []
 for i in range(RvaluesX.shape[0]):
-    if RvaluesY[i] > 100-RvaluesX[i]:
+    if RvaluesY[i] > 1-RvaluesX[i]:
             X += [RvaluesX[i]]
             Y += [RvaluesY[i]]
 
