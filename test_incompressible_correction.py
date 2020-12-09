@@ -5,40 +5,37 @@ from datetime import timedelta as delta
 import matplotlib.pyplot as plt
 import matplotlib as mp
 
+# set path
+mainpath = '/Users/lrousselet/LOUISE/PARCELS/parcels/'
+
 # domain size
 xdim=103
 ydim=103
 pa = 0.8
 pb = 1.2
-Nx, Ny, Nz = xdim-1, ydim-1, 1
+Nx, Ny, Nz = xdim-2, ydim-2, 1
 Lx, Ly = 1e6, 1e6
 H = 1e3
 (U0, V0) = (0.5, 0.5)
-x = np.zeros(xdim, dtype=np.float32)
-y = np.zeros(ydim, dtype=np.float32)
-#x[1:Nx] = np.linspace(0, Nx, Nx-1, dtype=np.float32)
-#y[1:Ny] = np.linspace(0, Ny, Ny-1, dtype=np.float32)
-for i in range(1,Nx):
-    x[i] = 1/(Nx+1)*(i+1)
-
-for j in range(1,Ny):
-    y[j] = 1/(Ny+1)*(j+1+0.5)
-
-
-xe = np.amax(x)
-L = np.amax(y)
+xi = np.linspace(0, Nx+1, xdim, dtype=np.float32)
+yi = np.linspace(0, Ny+1, ydim, dtype=np.float32)
 #dx, dy, dz = Lx/(Nx-1), Ly/(Ny-1), H/(Nz)
 u = np.zeros((ydim, xdim), dtype=np.float32)
 v = np.zeros((ydim, xdim), dtype=np.float32)
 ue = np.zeros((ydim, xdim), dtype=np.float32)
 ve = np.zeros((ydim, xdim), dtype=np.float32)
 psi = np.zeros((ydim, xdim), dtype=np.float32)
-x1 = x #- dx/2
-y1 = y #- dy/2
+#x1 = xi - 1
+#y1 = yi - 1
+x1 = np.linspace(0, 1, xdim, dtype=np.float32)
+y1 = np.linspace(0, 1, xdim, dtype=np.float32)
+xe = np.amax(x1)
+L = np.amax(y1)
+
 
 for i in range(1,Nx):
    for j in range(1,Ny): 
-       psi[j,i] = np.sin(np.pi*(pa*(x[i]/xe) - pb*(y[j]/L)))*(x[i]*(x[i]-xe)*y[j]*(y[j]-L))**2;
+       psi[j,i] = np.sin(np.pi*(pa*(x1[i]/xe) - pb*(y1[j]/L)))*(x1[i]*(x1[i]-xe)*y1[j]*(y1[j]-L))**2;
 
 
 for i in range(1,Nx):
@@ -55,10 +52,10 @@ for i in range(1,Nx):
 #incompressible field
 for i in range(1,Nx):
     for j in range(1,Ny):
-        v[j,i] = v[j-1,i] - u[j,i] + u[j,i-1]
+        v[j+1,i] = v[j,i] - u[j,i+1] + u[j,i]
 
 data = {'U': u, 'V': v}
-dimensions = {'lon': x, 'lat': y}
+dimensions = {'lon': xi, 'lat': yi}
 allow_time_extrapolation = True
 #classical
 fieldset = FieldSet.from_data(data, dimensions, mesh='flat', allow_time_extrapolation=allow_time_extrapolation)
@@ -70,12 +67,12 @@ fieldsetCOR.U.interp_method = 'cgrid_velocity_incompressible'
 fieldsetCOR.V.interp_method = 'cgrid_velocity_incompressible'
 
 #test for N-E triangle
-RvaluesX = np.random.uniform(0.1,0.95,200)
-RvaluesY = np.random.uniform(0.1,0.95,200)
+RvaluesX = np.random.uniform(1,102,200)
+RvaluesY = np.random.uniform(1,102,200)
 count = 0
 X, Y = [], []
 for i in range(RvaluesX.shape[0]):
-    if RvaluesY[i] > 1-RvaluesX[i]:
+    if RvaluesY[i] > 100-RvaluesX[i]:
             X += [RvaluesX[i]]
             Y += [RvaluesY[i]]
 
@@ -91,8 +88,8 @@ def Advection2Dcorr_exact(particle, fieldset, time):
     pa = 0.8
     pb = 1.2
     (U0, V0) = (0.5, 0.5)
-    xe = 1.0
-    L = 1.0
+    xe = 102 #1
+    L = 102 #1
     
     #step 1 
     (xx, yy) = (particle.lon, particle.lat)
@@ -122,49 +119,49 @@ def Advection2Dcorr_exact(particle, fieldset, time):
 
 
 psetRK4_0 = ParticleSet(fieldset, pclass=ScipyParticle, lon=X, lat=Y)
-output = psetRK4_0.ParticleFile(name='tests/bilinear_interp_correction/2D_case_cgrid_RK4_exact.nc', outputdt=1)
-psetRK4_0.execute(Advection2Dcorr_exact, dt=0.1, runtime=500,output_file=output)
+output = psetRK4_0.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_exact.nc', outputdt=1)
+psetRK4_0.execute(Advection2Dcorr_exact, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
 #RK4 velocities + not corrected
 psetRK4_1 = ParticleSet(fieldset, pclass=ScipyParticle, lon=X, lat=Y)
-output = psetRK4_1.ParticleFile(name='tests/bilinear_interp_correction/2D_case_cgrid_RK4_VNC.nc', outputdt=1)
-psetRK4_1.execute(AdvectionRK4, dt=0.1, runtime=500,output_file=output)
+output = psetRK4_1.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VNC.nc', outputdt=1)
+psetRK4_1.execute(AdvectionRK4, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
 #RK4 velocities +  corrected
 psetRK4_2 = ParticleSet(fieldsetCOR, pclass=ScipyParticle, lon=X, lat=Y)
-output = psetRK4_2.ParticleFile(name='tests/bilinear_interp_correction/2D_case_cgrid_RK4_VC2.nc', outputdt=1)
-psetRK4_2.execute(AdvectionRK4, dt=0.1, runtime=500,output_file=output)
+output = psetRK4_2.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VC.nc', outputdt=1)
+psetRK4_2.execute(AdvectionRK4, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
 #do some plots
 import xarray as xr
 
-data_xarray_0 = xr.open_dataset('tests/bilinear_interp_correction/2D_case_cgrid_RK4_exact.nc')
+data_xarray_0 = xr.open_dataset(mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_exact.nc')
 xp_0 = data_xarray_0['lon'].values
 yp_0 = data_xarray_0['lat'].values
 
-data_xarray_1 = xr.open_dataset('tests/bilinear_interp_correction/2D_case_cgrid_RK4_VNC.nc')
+data_xarray_1 = xr.open_dataset(mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VNC.nc')
 xp_1 = data_xarray_1['lon'].values
 yp_1 = data_xarray_1['lat'].values
 
-data_xarray_2 = xr.open_dataset('tests/bilinear_interp_correction/2D_case_cgrid_RK4_VC.nc')
+data_xarray_2 = xr.open_dataset(mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VC.nc')
 xp_2 = data_xarray_2['lon'].values
 yp_2 = data_xarray_2['lat'].values
 
 fig, ax = plt.subplots(figsize=(15,10),facecolor='w')
-cs = ax.pcolor(x[1:Nx],y[1:Ny],psi[1:Ny,1:Nx])
-plt.streamplot(x[1:Nx],y[1:Ny],ue[1:Ny,1:Nx],ve[1:Ny,1:Nx],color='k')
-fig.colorbar(cs)
-for ii in range(xp_2.shape[0]):
-       plt.plot(xp_2[ii,],yp_2[ii,])
+#cs = ax.pcolor(xi,y[1:Ny],psi[1:Ny,1:Nx])
+plt.streamplot(xi,yi,u,v,color='k')
+#fig.colorbar(cs)
+for ii in range(xp_0.shape[0]):
+       plt.plot(xp_0[ii,],yp_0[ii,])
 font = {'family' : 'normal',
         'weight' : 'normal',
         'size'   : 30}
 mp.rc('font', **font)
 plt.title('2D bilinear case')
-plt.savefig('tests/bilinear_interp_correction/FIGURES/2D_cgrid_RK4_VC.png', dpi=100)
+plt.savefig(mainpath+'tests/bilinear_interp_correction/FIGURES/2D_cgrid_RK4_VC.png', dpi=100)
 plt.show()
 
 fig, ax = plt.subplots(figsize=(15,10),facecolor='w')
@@ -175,7 +172,7 @@ plt.plot(xp_1[:,0],yp_1[:,0],'rx')#initial position
 plt.plot(xp_2[:,0],yp_2[:,0],'bx')#initial position
 mp.rc('font', **font)
 plt.title('2D cgrid: initial positions')
-plt.savefig('tests/bilinear_interp_correction/FIGURES/2D_cgrid_init.png', dpi=100)
+plt.savefig(mainpath+'tests/bilinear_interp_correction/FIGURES/2D_cgrid_init.png', dpi=100)
 plt.show()
 
 fig, ax = plt.subplots(figsize=(15,10),facecolor='w')
@@ -190,5 +187,5 @@ font = {'family' : 'normal',
         'size'   : 30}
 mp.rc('font', **font)
 plt.legend(handles=[plota,plotb,plotc],loc='lower left',fontsize='x-small')
-plt.savefig('tests/bilinear_interp_correction/FIGURES/2D_cgrid_finalpos.png', dpi=100)
+plt.savefig(mainpath+'tests/bilinear_interp_correction/FIGURES/2D_cgrid_finalpos.png', dpi=100)
 plt.show()
