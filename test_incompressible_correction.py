@@ -8,54 +8,58 @@ import matplotlib as mp
 # set path
 mainpath = '/Users/lrousselet/LOUISE/PARCELS/parcels/'
 
-# domain size
-xdim=103
-ydim=103
-pa = 0.8
-pb = 1.2
-Nx, Ny, Nz = xdim-2, ydim-2, 1
-Lx, Ly = 1e6, 1e6
-H = 1e3
-(U0, V0) = (0.5, 0.5)
-xi = np.linspace(0, Nx+1, xdim, dtype=np.float32)
-yi = np.linspace(0, Ny+1, ydim, dtype=np.float32)
-#dx, dy, dz = Lx/(Nx-1), Ly/(Ny-1), H/(Nz)
-u = np.zeros((ydim, xdim), dtype=np.float32)
-v = np.zeros((ydim, xdim), dtype=np.float32)
-ue = np.zeros((ydim, xdim), dtype=np.float32)
-ve = np.zeros((ydim, xdim), dtype=np.float32)
-psi = np.zeros((ydim, xdim), dtype=np.float32)
-#x1 = xi - 1
-#y1 = yi - 1
-x1 = np.linspace(0, 1, xdim, dtype=np.float32)
-y1 = np.linspace(0, 1, xdim, dtype=np.float32)
+#dimensions
+xdim = 103
+ydim = 103
+(Nx, Ny) = (xdim - 2, ydim - 2)
+xi = np.linspace(0,Nx+1,xdim,dtype=np.float32)
+yi = np.linspace(0,Ny+1,ydim,dtype=np.float32)
+u = np.zeros((ydim,xdim),dtype=np.float32)
+v = np.zeros((ydim,xdim),dtype=np.float32)
+ue = np.zeros((ydim,xdim),dtype=np.float32)
+ve = np.zeros((ydim,xdim),dtype=np.float32)
+U = np.zeros((ydim,xdim),dtype=np.float32)
+V = np.zeros((ydim,xdim),dtype=np.float32)
+psi = np.zeros((ydim,xdim),dtype=np.float32)
+x1 = np.linspace(-1,Nx-1,Nx+1,dtype=np.float32)
+y1 = np.linspace(-1,Ny-1,Ny+1,dtype=np.float32)
 xe = np.amax(x1)
-L = np.amax(y1)
+L = np.max(y1)
+dxG = np.diff(xi)
+dxG = np.tile(dxG,(Ny+1,1))
+dyG = np.diff(yi)
+dyG = np.tile(dyG,(Nx+1,1))
+
+#params
+a = 0.8
+b = 1.2
+U0 = 0.5
+
+#psi for figure
+for i in range(2,Nx):
+    for j in range(2,Ny):
+        psi[j,i] = np.sin(np.pi*(a*(x1[i]/xe)-b*(y1[j]/L)))*(x1[i]*(x1[i]-xe)*y1[j]*(y1[j]-L))**2
+
+#u and v exact
+for i in range(2,Nx):
+    for j in range(2,Ny):
+        X = x1[i]/xe; Y = y1[j]/L
+        ue[j,i] = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+        ue[j,i] = ue[j,i]*U0
+        ve[j,i] = 2*(Y*(Y-1))**2*(X*(X-1)**2+X**2*(X-1))*np.sin(np.pi*(a*X-b*Y)) + a*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+        ve[j,i] = ve[j,i]*U0
+
+#u and v incompressible
+u = ue
+for i in range(2,Nx):
+    for j in range(2,Ny):
+        U[j,i] = u[j,i]*dyG[j,i]
+        V[j,i] = V[j-1,i] - U[j,i] + U[j,i-1]
+        v[j,i] = V[j,i]/dxG[j,i]
 
 
-for i in range(1,Nx):
-   for j in range(1,Ny): 
-       psi[j,i] = np.sin(np.pi*(pa*(x1[i]/xe) - pb*(y1[j]/L)))*(x1[i]*(x1[i]-xe)*y1[j]*(y1[j]-L))**2;
-
-
-for i in range(1,Nx):
-    for j in range(1,Ny):
-        c = np.pi * (pa*(x1[i]/xe) - pb*(y1[j]/L))
-        u[j, i] = ((-2*(((x1[i]/xe)*((x1[i]/xe)-1))**2)*(((y1[j]/L)*(((y1[j]/L)-1)**2))+(((y1[j]/L)**2)*((y1[j]/L)-1)))*np.sin(c))+(pb*(np.pi/L)*np.cos(c)*((x1[i]/xe)*((x1[i]/xe)-1)*(y1[j]/L)*((y1[j]/L)-1))**2))/L
-        u[j, i] = U0*(u[j,i])
-#exact solution
-        ue[j, i] = u[j,i]
-        ve[j, i] = ((2*(((x1[i]/xe)*((x1[i]/xe)-1)**2)+(((x1[i]/xe)-1)*(x1[i]/xe)**2))*(((y1[j]/L)*((y1[j]/L)-1))**2)*np.sin(c))+(pa*(np.pi/xe)*np.cos(c)*(((x1[i]/xe)*((x1[i]/xe)-1)*(y1[j]/L)*((y1[j]/L)-1))**2)))/xe
-        ve[j, i] = V0*(ve[j,i])
-
-
-#incompressible field
-for i in range(1,Nx):
-    for j in range(1,Ny):
-        v[j+1,i] = v[j,i] - u[j,i+1] + u[j,i]
-
-data = {'U': u, 'V': v}
-dimensions = {'lon': xi, 'lat': yi}
+data = {'U': u, 'V': v, 'dxG': dxG, 'dyG': dyG}
+dimensions = {'U':{'lon': xi, 'lat': yi}, 'V':{'lon': xi, 'lat': yi}, 'dxG':{'lon': xi[0:-1]}, 'dyG':{'lat': yi[0:-1]}}
 allow_time_extrapolation = True
 #classical
 fieldset = FieldSet.from_data(data, dimensions, mesh='flat', allow_time_extrapolation=allow_time_extrapolation)
@@ -70,13 +74,13 @@ fieldsetCOR.V.interp_method = 'cgrid_velocity_incompressible'
 RvaluesX = np.random.uniform(1,102,200)
 RvaluesY = np.random.uniform(1,102,200)
 count = 0
-X, Y = [], []
+partX, partY = [], []
 for i in range(RvaluesX.shape[0]):
     if RvaluesY[i] > 100-RvaluesX[i]:
-            X += [RvaluesX[i]]
-            Y += [RvaluesY[i]]
+            partX += [RvaluesX[i]]
+            partY += [RvaluesY[i]]
 
-X, Y = np.array(X), np.array(Y)
+partX, partY = np.array(partX), np.array(partY)
 
 # RK4 exact solution with no interpolation
 def Advection2Dcorr_exact(particle, fieldset, time):
@@ -87,33 +91,41 @@ def Advection2Dcorr_exact(particle, fieldset, time):
     #param
     pa = 0.8
     pb = 1.2
-    (U0, V0) = (0.5, 0.5)
-    xe = 102 #1
-    L = 102 #1
+    U0 = 0.5
+    xe = 100
+    L = 100
     
     #step 1 
     (xx, yy) = (particle.lon, particle.lat)
-    c = np.pi * (pa*(xx/xe) - pb*(yy/L))
-    u1 = (((-2*(((xx/xe)*((xx/xe)-1))**2)*(((yy/L)*(((yy/L)-1)**2))+(((yy/L)**2)*((yy/L)-1)))*np.sin(c))+(pb*(np.pi/L)*np.cos(c)*((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2))/L)*U0
-    v1 = (((2*(((xx/xe)*((xx/xe)-1)**2)+(((xx/xe)-1)*(xx/xe)**2))*(((yy/L)*((yy/L)-1))**2)*np.sin(c))+(pa*(np.pi/xe)*np.cos(c)*(((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2)))/xe)*V0    
+    (X, Y) = (xx/xe, yy/L)
+    u1 = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    u1 = u1*U0
+    v1 = 2*(Y*(Y-1))**2*(X*(X-1)**2+X**2*(X-1))*np.sin(np.pi*(a*X-b*Y)) + a*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    v1 = v1*U0
     lon1, lat1 = (particle.lon + u1*.5*particle.dt, particle.lat + v1*.5*particle.dt)
     #step 2 
     (xx, yy) = (lon1, lat1)
-    c = np.pi * (pa*(xx/xe) - pb*(yy/L))
-    u2 = (((-2*(((xx/xe)*((xx/xe)-1))**2)*(((yy/L)*(((yy/L)-1)**2))+(((yy/L)**2)*((yy/L)-1)))*np.sin(c))+(pb*(np.pi/L)*np.cos(c)*((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2))/L)*U0
-    v2 = (((2*(((xx/xe)*((xx/xe)-1)**2)+(((xx/xe)-1)*(xx/xe)**2))*(((yy/L)*((yy/L)-1))**2)*np.sin(c))+(pa*(np.pi/xe)*np.cos(c)*(((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2)))/xe)*V0
+    (X, Y) = (xx/xe, yy/L)
+    u2 = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    u2 = u2*U0
+    v2 = 2*(Y*(Y-1))**2*(X*(X-1)**2+X**2*(X-1))*np.sin(np.pi*(a*X-b*Y)) + a*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    v2 = v2*U0
     lon2, lat2 = (particle.lon + u2*.5*particle.dt, particle.lat + v2*.5*particle.dt)
     #step 3
     (xx, yy) = (lon2, lat2)
-    c = np.pi * (pa*(xx/xe) - pb*(yy/L))
-    u3 = (((-2*(((xx/xe)*((xx/xe)-1))**2)*(((yy/L)*(((yy/L)-1)**2))+(((yy/L)**2)*((yy/L)-1)))*np.sin(c))+(pb*(np.pi/L)*np.cos(c)*((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2))/L)*U0
-    v3 = (((2*(((xx/xe)*((xx/xe)-1)**2)+(((xx/xe)-1)*(xx/xe)**2))*(((yy/L)*((yy/L)-1))**2)*np.sin(c))+(pa*(np.pi/xe)*np.cos(c)*(((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2)))/xe)*V0
+    (X, Y) = (xx/xe, yy/L)
+    u3 = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    u3 = u3*U0
+    v3 = 2*(Y*(Y-1))**2*(X*(X-1)**2+X**2*(X-1))*np.sin(np.pi*(a*X-b*Y)) + a*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    v3 = v3*U0
     lon3, lat3 = (particle.lon + u3*particle.dt, particle.lat + v3*particle.dt)
     #step 4 
     (xx, yy) = (lon3, lat3)
-    c = np.pi * (pa*(xx/xe) - pb*(yy/L))
-    u4 = (((-2*(((xx/xe)*((xx/xe)-1))**2)*(((yy/L)*(((yy/L)-1)**2))+(((yy/L)**2)*((yy/L)-1)))*np.sin(c))+(pb*(np.pi/L)*np.cos(c)*((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2))/L)*U0
-    v4 = (((2*(((xx/xe)*((xx/xe)-1)**2)+(((xx/xe)-1)*(xx/xe)**2))*(((yy/L)*((yy/L)-1))**2)*np.sin(c))+(pa*(np.pi/xe)*np.cos(c)*(((xx/xe)*((xx/xe)-1)*(yy/L)*((yy/L)-1))**2)))/xe)*V0    
+    (X, Y) = (xx/xe, yy/L)
+    u4 = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    u4 = u4*U0
+    v4 = 2*(Y*(Y-1))**2*(X*(X-1)**2+X**2*(X-1))*np.sin(np.pi*(a*X-b*Y)) + a*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+    v4 = v4*U0
     particle.lon += (u1 + 2*u2 + 2*u3 + u4) / 6. * particle.dt
     particle.lat += (v1 + 2*v2 + 2*v3 + v4) / 6. * particle.dt
 
