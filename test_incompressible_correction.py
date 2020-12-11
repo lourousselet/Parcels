@@ -25,10 +25,12 @@ x1 = np.linspace(-1,Nx-1,Nx+1,dtype=np.float32)
 y1 = np.linspace(-1,Ny-1,Ny+1,dtype=np.float32)
 xe = np.amax(x1)
 L = np.max(y1)
-dxG = np.diff(xi)
-dxG = np.tile(dxG,(Ny+1,1))
-dyG = np.diff(yi)
-dyG = np.tile(dyG,(Nx+1,1))
+dxG = np.zeros((xdim,),dtype=np.float32)
+dyG = np.zeros((ydim,),dtype=np.float32)
+dxG[1:Nx+1] = np.diff(x1)
+dxG = np.tile(dxG,(ydim,1))
+dyG[1:Ny+1] = np.diff(y1)
+dyG = np.tile(dyG,(xdim,1))
 
 #params
 a = 0.8
@@ -36,13 +38,13 @@ b = 1.2
 U0 = 0.5
 
 #psi for figure
-for i in range(2,Nx):
-    for j in range(2,Ny):
+for i in range(1,Nx):
+    for j in range(1,Ny):
         psi[j,i] = np.sin(np.pi*(a*(x1[i]/xe)-b*(y1[j]/L)))*(x1[i]*(x1[i]-xe)*y1[j]*(y1[j]-L))**2
 
 #u and v exact
-for i in range(2,Nx):
-    for j in range(2,Ny):
+for i in range(1,Nx):
+    for j in range(1,Ny):
         X = x1[i]/xe; Y = y1[j]/L
         ue[j,i] = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
         ue[j,i] = ue[j,i]*U0
@@ -50,16 +52,18 @@ for i in range(2,Nx):
         ve[j,i] = ve[j,i]*U0
 
 #u and v incompressible
-u = ue
-for i in range(2,Nx):
-    for j in range(2,Ny):
+for i in range(1,Nx):
+    for j in range(1,Ny):
+        X = x1[i]/xe; Y = (y1[j]-0.5)/L
+        u[j,i] = -2*(X*(X-1))**2*(Y*(Y-1)**2+Y**2*(Y-1))*np.sin(np.pi*(a*X-b*Y)) + b*np.pi*np.cos(np.pi*(a*X-b*Y))*(X*(X-1)*Y*(Y-1))**2
+        u[j,i] = u[j,i]*U0
         U[j,i] = u[j,i]*dyG[j,i]
         V[j,i] = V[j-1,i] - U[j,i] + U[j,i-1]
         v[j,i] = V[j,i]/dxG[j,i]
 
 
 data = {'U': u, 'V': v, 'dxG': dxG, 'dyG': dyG}
-dimensions = {'U':{'lon': xi, 'lat': yi}, 'V':{'lon': xi, 'lat': yi}, 'dxG':{'lon': xi[0:-1]}, 'dyG':{'lat': yi[0:-1]}}
+dimensions = {'U':{'lon': xi, 'lat': yi}, 'V':{'lon': xi, 'lat': yi}, 'dxG':{'lon': xi, 'lat': yi}, 'dyG':{'lon': xi, 'lat': yi}}
 allow_time_extrapolation = True
 #classical
 fieldset = FieldSet.from_data(data, dimensions, mesh='flat', allow_time_extrapolation=allow_time_extrapolation)
@@ -71,7 +75,7 @@ fieldsetCOR.U.interp_method = 'cgrid_velocity_incompressible'
 fieldsetCOR.V.interp_method = 'cgrid_velocity_incompressible'
 
 #test for N-E triangle
-RvaluesX = np.random.uniform(1,102,200)
+RvaluesX = np.random.uniform(1,100,200)
 RvaluesY = np.random.uniform(1,102,200)
 count = 0
 partX, partY = [], []
@@ -89,8 +93,8 @@ def Advection2Dcorr_exact(particle, fieldset, time):
     Function needs to be converted to Kernel object before execution
     2D Test case with exact solution and no interpolation"""
     #param
-    pa = 0.8
-    pb = 1.2
+    a = 0.8
+    b = 1.2
     U0 = 0.5
     xe = 100
     L = 100
@@ -130,20 +134,22 @@ def Advection2Dcorr_exact(particle, fieldset, time):
     particle.lat += (v1 + 2*v2 + 2*v3 + v4) / 6. * particle.dt
 
 
-psetRK4_0 = ParticleSet(fieldset, pclass=ScipyParticle, lon=X, lat=Y)
+psetRK4_0 = ParticleSet(fieldset, pclass=ScipyParticle, lon=partX, lat=partY)
 output = psetRK4_0.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_exact.nc', outputdt=1)
 psetRK4_0.execute(Advection2Dcorr_exact, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
 #RK4 velocities + not corrected
-psetRK4_1 = ParticleSet(fieldset, pclass=ScipyParticle, lon=X, lat=Y)
+psetRK4_1 = ParticleSet(fieldset, pclass=ScipyParticle, lon=partX, lat=partY)
 output = psetRK4_1.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VNC.nc', outputdt=1)
 psetRK4_1.execute(AdvectionRK4, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
 #RK4 velocities +  corrected
-psetRK4_2 = ParticleSet(fieldsetCOR, pclass=ScipyParticle, lon=X, lat=Y)
+psetRK4_2 = ParticleSet(fieldsetCOR, pclass=ScipyParticle, lon=partX, lat=partY)
 output = psetRK4_2.ParticleFile(name=mainpath+'tests/bilinear_interp_correction/2D_case_cgrid_RK4_VC.nc', outputdt=1)
+fieldsetCOR.UV.dxG = fieldsetCOR.dxG
+fieldsetCOR.UV.dyG = fieldsetCOR.dyG
 psetRK4_2.execute(AdvectionRK4, dt=0.1, runtime=1000,output_file=output)
 output.close()
 
