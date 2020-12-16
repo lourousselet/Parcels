@@ -1500,28 +1500,32 @@ class VectorField(object):
 
         elif self.U.interp_method == 'cgrid_velocity_incompressible':
             if self.gridindexingtype == 'nemo':
-                # TODO need to use actual grid size instead of c1, c2, c3, c4 etc
-                U0 = self.U.data[ti, yi+1, xi] * self.fieldset.dyG.data[ti, yi+1, xi]
-                U1 = self.U.data[ti, yi+1, xi+1] * self.fieldset.dyG.data[ti, yi+1, xi+1]
-                U2 = self.U.data[ti, yi, xi] * self.fieldset.dyG.data[ti, yi, xi]
-                U3 = self.U.data[ti, yi, xi+1] * self.fieldset.dyG.data[ti, yi, xi+1]
+                #indices different for U and V
+                ii = xi
+                jj = np.int(np.round(y-0.5))
+                U0 = self.U.data[ti, jj+1, ii] * self.fieldset.dyG.data[ti, jj+1, ii]
+                U1 = self.U.data[ti, jj+1, ii+1] * self.fieldset.dyG.data[ti, jj+1, ii+1]
+                U2 = self.U.data[ti, jj, ii] * self.fieldset.dyG.data[ti, jj, ii]
+                U3 = self.U.data[ti, jj, ii+1] * self.fieldset.dyG.data[ti, jj, ii+1]
 
-                V0 = self.V.data[ti, yi, xi+1] * self.fieldset.dxG.data[ti, yi, xi+1]
-                V1 = self.V.data[ti, yi+1, xi+1] * self.fieldset.dxG.data[ti, yi+1, xi+1]
-                V2 = self.V.data[ti, yi, xi] * self.fieldset.dxG.data[ti, yi, xi]
-                V3 = self.V.data[ti, yi+1, xi] * self.fieldset.dxG.data[ti ,yi+1, xi]
+                Tu = 2*((x-ii-1) * (y-jj-0.5) * U2
+                     + (x-ii) * (y-jj) * U1
+                     - (x-ii) * (y-jj-0.5) * U3
+                     - (x-ii-1) * (y-jj) * U0)
+
+                ii = np.int(np.round(x-0.5))
+                jj = yi
+                V0 = self.V.data[ti, jj, ii+1] * self.fieldset.dxG.data[ti, jj, ii+1]
+                V1 = self.V.data[ti, jj+1, ii+1] * self.fieldset.dxG.data[ti, jj+1, ii+1]
+                V2 = self.V.data[ti, jj, ii] * self.fieldset.dxG.data[ti, jj, ii]
+                V3 = self.V.data[ti, jj+1, ii] * self.fieldset.dxG.data[ti ,jj+1, ii]
                 
-                Tu = ((x-xi-1) * (y-yi-1) * U2
-		     + (x-xi) * (y-yi) * U1
-                     - (x-xi) * (y-yi-1) * U3
-                     - (x-xi-1) * (y-yi) * U0)
+                Tv = 2*((x-ii-0.5) * (y-jj-1) * V2
+                    + (x-ii) * (y-jj) * V1
+                    - (x-ii) * (y-jj-1) * V0
+                    - (x-ii-0.5) * (y-jj) * V3)
                     
-                Tv = ((x-xi-1) * (y-yi-1) * V2
-                    + (x-xi) * (y-yi) * V1
-                    - (x-xi) * (y-yi-1) * V0
-                    - (x-xi-1) * (y-yi) * V3)
-                    
-                #correction + TO BE CHECKED transports are divided by dxdy to get velocities in m/s ?
+                #correction
                 alpha = U2 - U3 + U1 - U0
                 beta = V2 - V0 + V1 - V3              
                 rA = self.fieldset.dyG.data[ti, yi+1, xi] * self.fieldset.dxG.data[ti, yi, xi+1]
@@ -1530,26 +1534,30 @@ class VectorField(object):
                     
             elif self.gridindexingtype == 'mitgcm':
                 # TODO need to use actual grid size instead of c1, c2, c3, c4 etc
-                U0 = self.U.data[ti, yi, xi] * self.fieldset.dyG.data[ti, yi, xi]
-                U1 = self.U.data[ti, yi, xi + 1] * self.fieldset.dyG.data[ti, yi, xi+1]
-                U2 = self.U.data[ti, yi+1, xi] * self.fieldset.dyG.data[ti, yi+1, xi]
-                U3 = self.U.data[ti, yi+1, xi + 1] * self.fieldset.dyG.data[ti, yi+1, xi+1]
+                ii = xi
+                jj = np.int(np.round(y-0.5))
+                U0 = self.U.data[ti, jj, ii] * self.fieldset.dyG.data[ti, jj, ii]
+                U1 = self.U.data[ti, jj, ii + 1] * self.fieldset.dyG.data[ti, jj, ii+1]
+                U2 = self.U.data[ti, jj+1, ii] * self.fieldset.dyG.data[ti, jj+1, ii]
+                U3 = self.U.data[ti, jj+1, ii + 1] * self.fieldset.dyG.data[ti, jj+1, ii+1]
 
-                V0 = self.V.data[ti, yi, xi] * self.fieldset.dxG.data[ti, yi, xi]
-                V1 = self.V.data[ti, yi + 1, xi] * self.fieldset.dxG.data[ti, yi+1, xi]
-                V2 = self.V.data[ti, yi, xi+1] * self.fieldset.dxG.data[ti, yi, xi+1]
-                V3 = self.V.data[ti, yi+1, xi + 1] * self.fieldset.dxG.data[ti, yi+1, xi+1]
-                
-                Tu = ((x-xi-1) * (y-yi-1) * U0
-                    + (x-xi) * (y-yi) * U3
-                    - (x-xi) * (y-yi-1) * U1
-                    - (x-xi-1) * (y-yi) * U2)
-                    
-                Tv = ((x-xi-1) * (y-yi-1) * V0
-                    + (x-xi) * (y-yi) * V3
-                    - (x-xi) * (y-yi-1) * V2
-                    - (x-xi-1) * (y-yi) * V1)
-                    
+                Tu = 2*((x-ii-1) * (y-jj-0.5) * U2
+                     + (x-ii) * (y-jj) * U1
+                     - (x-ii) * (y-jj-0.5) * U3
+                     - (x-ii-1) * (y-jj) * U0)
+
+                ii = np.int(np.round(x-0.5))
+                jj = yi
+                V0 = self.V.data[ti, jj, ii] * self.fieldset.dxG.data[ti, jj, ii]
+                V1 = self.V.data[ti, jj + 1, ii] * self.fieldset.dxG.data[ti, jj+1, ii]
+                V2 = self.V.data[ti, jj, ii+1] * self.fieldset.dxG.data[ti, jj, ii+1]
+                V3 = self.V.data[ti, jj+1, ii + 1] * self.fieldset.dxG.data[ti, jj+1, ii+1]
+
+                Tv = 2*((x-ii-0.5) * (y-jj-1) * V2
+                    + (x-ii) * (y-jj) * V1
+                    - (x-ii) * (y-jj-1) * V0
+                    - (x-ii-0.5) * (y-jj) * V3)
+  
                 #correction + TO BE CHECKED transports are divided by dxdy to get velocities in m/s ?
                 alpha = U0 - U1 + U3 - U2
                 beta = V0 - V2 + V3 - V1  
